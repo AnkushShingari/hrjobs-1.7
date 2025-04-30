@@ -1,21 +1,12 @@
 <?php
-
 if (!defined('ABSPATH')) {
-
     exit;
-
 }
 
-
-
 global $wpdb;
-
 $jobs_table = $wpdb->prefix . 'jobs'; // Jobs table name
 
-
-
 // Handle tab switching
-
 $current_tab = isset($_GET['tab']) ? $_GET['tab'] : 'all_jobs';
 
 
@@ -222,89 +213,59 @@ function hrjobs_add_job_form($wpdb, $jobs_table)
     <p><input type="submit" name="submit_job" value="Add Job" class="button button-primary"></p>
 </form>
 
-<!-- Enqueue WordPress TinyMCE and Admin Scripts -->
-<?php
-// function enqueue_custom_admin_scripts($hook) {
-//     // Make sure it's the correct admin page
-//     if ('toplevel_page_hrjobs' != $hook) return;
-
-//     // Enqueue WordPress TinyMCE scripts and styles
-//     wp_enqueue_script('tiny_mce');
-//     wp_enqueue_script('wp-tinymce');
-//     wp_enqueue_script('jquery');
-// }
-// add_action('admin_enqueue_scripts', 'enqueue_custom_admin_scripts');
-?>
 
 <?php
 
 }
 
-
-
-// Function to list jobs (can be filtered by status and country)
+// All Jobs and Filters
 function hrjobs_list_jobs($wpdb, $jobs_table, $status = null, $filter_country = '') {
-    // Check if the form has been submitted and capture the selected portfolio category
-    $filter_portfolio_category = isset($_POST['filter_portfolio_category']) ? sanitize_text_field($_POST['filter_portfolio_category']) : '';
+    // Capture selected country from form
+    $filter_country = isset($_POST['filter_country']) ? sanitize_text_field($_POST['filter_country']) : '';
+
+    // Get all distinct countries for the dropdown
+    $countries = $wpdb->get_col("SELECT DISTINCT country FROM $jobs_table WHERE country IS NOT NULL AND country != ''");
 
     // Country filter form
-?>
-<form method="POST" style="margin-bottom: 20px;">
-    <label for="filter_portfolio_category">Filter by Portfolio Category:</label>
-    <select name="filter_portfolio_category" id="filter_portfolio_category">
-        <option value="">All Categories</option>
-        <?php
-        // Get all categories from the 'portfolio-types' taxonomy
-        $portfolio_categories = get_terms(array(
-            'taxonomy' => 'portfolio-types',
-            'hide_empty' => false,
-        ));
-
-        if (!empty($portfolio_categories) && !is_wp_error($portfolio_categories)) {
-            foreach ($portfolio_categories as $category) {
-                $selected = ($filter_portfolio_category == $category->name) ? 'selected' : '';
-                echo '<option value="' . esc_attr($category->name) . '" ' . $selected . '>' . esc_html($category->name) . '</option>';
+    ?>
+    <form method="POST" style="margin: 20px 0px;">
+        <label for="filter_country"><strong>Filter by country:</strong></label>
+        <select name="filter_country" id="filter_country">
+            <option value="">All countries</option>
+            <?php
+            if (!empty($countries)) {
+                foreach ($countries as $country) {
+                    $selected = ($filter_country == $country) ? 'selected' : '';
+                    echo '<option value="' . esc_attr($country) . '" ' . $selected . '>' . esc_html($country) . '</option>';
+                }
+            } else {
+                echo '<option value="">No country found.</option>';
             }
-        } else {
-            echo '<option value="">No categories found.</option>';
-        }
-        ?>
-    </select>
-    <input type="submit" value="Filter" class="button">
-</form>
+            ?>
+        </select>
+        <input type="submit" value="Filter" class="button">
+    </form>
+    <?php
 
-<?php
-    // Debugging output
-    echo '<p>Selected Portfolio Category: ' . esc_html($filter_portfolio_category) . '</p>';
-    echo '<p>Selected Country: ' . esc_html($filter_country) . '</p>';
-
-    // Query to fetch jobs
+    // Build the query
     $query = "SELECT * FROM $jobs_table WHERE 1=1";
 
+    // Add status condition
     if ($status !== null) {
-        $query .= " AND status = $status";
+        $query .= $wpdb->prepare(" AND status = %d", $status);
     }
 
-    // Add condition for country filter
+    // Add country filter condition
     if (!empty($filter_country)) {
         $query .= $wpdb->prepare(" AND country = %s", $filter_country);
     }
 
-    // Add condition for portfolio category filter by name
-    if (!empty($filter_portfolio_category)) {
-        $query .= $wpdb->prepare(" AND portfolio_category = %s", $filter_portfolio_category);
-    }
-
-    // Debugging: Output the final query
-    echo '<p>SQL Query: ' . esc_html($query) . '</p>';
-
     $jobs = $wpdb->get_results($query);
 
-    // Debugging: Output the number of jobs found
-    echo '<p>Jobs Found: ' . count($jobs) . '</p>';
+    echo '<p><strong>Jobs Found: </strong>' . count($jobs) . '</p>';
 
     if ($jobs) {
-?>
+        ?>
         <table class="widefat">
             <thead>
                 <tr>
@@ -333,9 +294,8 @@ function hrjobs_list_jobs($wpdb, $jobs_table, $status = null, $filter_country = 
                 <?php } ?>
             </tbody>
         </table>
-<?php
+        <?php
     } else {
         echo '<p>No jobs found.</p>';
     }
 }
-
