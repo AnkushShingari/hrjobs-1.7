@@ -1,40 +1,26 @@
 <?php
-
 /*
-
 Plugin Name: HR Jobs
-
 Description: A plugin to manage job applications and job postings.
-
-Version: 1.3
-
-Author: Techarch Softwares
-
+Version: 1.7
+Author: AnkushK2022
 */
 
-
-
 // Exit if accessed directly.
-
 if (!defined('ABSPATH')) {
-
     exit;
-
 }
 
 // Activation hook to create tables and add menu.
 register_activation_hook(__FILE__, 'hrjobs_create_tables');
 
-function hrjobs_create_tables()
-
-{
-
+function hrjobs_create_tables(){
     global $wpdb;
     
     $charset_collate = $wpdb->get_charset_collate();
     $table_applications = $wpdb->prefix . 'job_applications';
 	
-    $sql_applications = "CREATE TABLE $table_applications (
+    $sql_applications = "CREATE TABLE IF NOT EXISTS $table_applications (
         id bigint(20) UNSIGNED NOT NULL AUTO_INCREMENT,
         job_id bigint(20) UNSIGNED NOT NULL,
         first_name varchar(255) NOT NULL,
@@ -43,36 +29,25 @@ function hrjobs_create_tables()
         phone bigint(20) UNSIGNED NOT NULL,
         birthday date NOT NULL,
         file varchar(255) NOT NULL,
+        date_applied datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
         PRIMARY KEY (id)
     ) $charset_collate;";
-    
-    
+
 // Table name for jobs
 
 $table_jobs = $wpdb->prefix . 'jobs';
 
-$sql_jobs = "CREATE TABLE $table_jobs (
+$sql_jobs = "CREATE TABLE IF NOT EXISTS $table_jobs (
 
     id bigint(20) UNSIGNED NOT NULL AUTO_INCREMENT,
-
     job_title varchar(255) NOT NULL,
-
     location varchar(255) NOT NULL,
-
     country varchar(255) NOT NULL,
-
     tagline varchar(255),
-
     job_brief longtext NOT NULL,
-
     responsibilities longtext NOT NULL,
-
     requirement longtext NOT NULL,
-
-    date_of_application datetime NOT NULL,
-
     status tinyint(1) NOT NULL DEFAULT 1,  /* 1 as open | 0 as closed */
-
     PRIMARY KEY (id)
 
 ) $charset_collate;";
@@ -87,275 +62,157 @@ $sql_jobs = "CREATE TABLE $table_jobs (
         PRIMARY KEY (id)
     ) $charset_collate;";
 
-
+    $wpdb->query("ALTER TABLE $table_applications ADD COLUMN date_applied datetime NOT NULL DEFAULT CURRENT_TIMESTAMP");
 
     require_once(ABSPATH . 'wp-admin/includes/upgrade.php');
 
     dbDelta($sql_applications);
-	
     dbDelta($sql_jobs_mail_addresses);
-	
     dbDelta($sql_jobs);
-
 }
 
 
 
 // Deactivation hook to delete tables.
+// register_deactivation_hook(__FILE__, 'hrjobs_delete_tables');
 
-register_deactivation_hook(__FILE__, 'hrjobs_delete_tables');
+// function hrjobs_delete_tables()
+// {
+//    global $wpdb;
 
+//     // Table names for job applications and jobs.
+//     $table_applications = $wpdb->prefix . 'job_applications';
+//     $table_jobs = $wpdb->prefix . 'jobs';
+// 	   $table_jobs_mail_addresses = $wpdb->prefix . 'jobs_mail_addresses';
 
-
-function hrjobs_delete_tables()
-
-{
-
-   global $wpdb;
-
-
-
-    // Table names for job applications and jobs.
-
-    $table_applications = $wpdb->prefix . 'job_applications';
-
-    $table_jobs = $wpdb->prefix . 'jobs';
-
-	$table_jobs_mail_addresses = $wpdb->prefix . 'jobs_mail_addresses';
-
-
-    // Drop tables if they exist.
-
-    $sql = "DROP TABLE IF EXISTS $table_applications, $table_jobs, $table_jobs_mail_addresses;";
-
-    $wpdb->query($sql);
-}
-
+//     // Drop tables if they exist.
+//     $sql = "DROP TABLE IF EXISTS $table_applications, $table_jobs, $table_jobs_mail_addresses;";
+//     $wpdb->query($sql);
+// }
 
 
 // Add a menu in the admin panel
 
+function hrjobs_menu() {
+    if ( current_user_can('manage_options') || current_user_can('access_hr_jobs') ) {
+        add_menu_page(
+            'HR Jobs',                    // Page title
+            'HR Jobs',                    // Menu title
+            'read',                       // Placeholder capability
+            'hrjobs',                     // Menu slug
+            'hrjobs_page_content',        // Callback function
+            'dashicons-clipboard',        // Icon
+            6                             // Position
+        );
+    }
+}
 add_action('admin_menu', 'hrjobs_menu');
 
 
-
-function hrjobs_menu()
-
-{
-
-    add_menu_page(
-
-        'HR Jobs',  // Page title
-
-        'HR Jobs',  // Menu title
-
-        'manage_options',  // Capability
-
-        'hrjobs',  // Menu slug
-
-        'hrjobs_page_content',  // Function to display the page content
-
-        'dashicons-clipboard',  // Icon
-
-        6  // Position
-
-    );
-
-}
-
-
-
 // Displaying the admin page content with tabs
 
-// Displaying the admin page content with tabs
-
-function hrjobs_page_content()
-
-{
-
-?>
-
-
+function hrjobs_page_content(){
+    if ( ! current_user_can('manage_options') && ! current_user_can('access_hr_jobs') ) {
+        wp_die(__('You do not have sufficient permissions to access this page.'));
+    }
+    ?>
 
     <div class="wrap">
-
         <h1><?php esc_html_e('HR Jobs', 'hrjobs'); ?></h1>
 
         <h2 class="nav-tab-wrapper">
-
             <a href="?page=hrjobs&tab=jobs" class="nav-tab <?php echo isset($_GET['tab']) && $_GET['tab'] == 'jobs' ? 'nav-tab-active' : ''; ?>">
-
                 Job Section
-
             </a>
-
             <a href="?page=hrjobs&tab=applications" class="nav-tab <?php echo isset($_GET['tab']) && $_GET['tab'] == 'applications' ? 'nav-tab-active' : ''; ?>">
-
                 Posted Applications
-
             </a>
-
             <a href="?page=hrjobs&tab=addresse" class="nav-tab <?php echo isset($_GET['tab']) && $_GET['tab'] == 'addresse' ? 'nav-tab-active' : ''; ?>">
-
                 Email Addresse
-
             </a>
-			
         </h2>
 
-
-
         <div class="tab-content">
-
             <?php
-
             $current_tab = isset($_GET['tab']) ? $_GET['tab'] : 'jobs';
 
-
-
             // Switch based on the tab
-
             switch ($current_tab) {
-
                 case 'applications':
-
                     hrjobs_posted_applications_content();
-
                     break;
-					
+
 				case 'addresse':
-				
 						hrjobs_adresses_content();
-						
 					break;
 
                 case 'view_job':
-
                     if (isset($_GET['job_id'])) {
-
                         hrjobs_view_job_content($_GET['job_id']);
-
                     }
-
                     break;
 
                 case 'edit_job':
-
                     if (isset($_GET['job_id'])) {
-
                         hrjobs_edit_job_content($_GET['job_id']);
-
                     }
-
                     break;
 
                 case 'jobs':
-
                 default:
-
                     hrjobs_job_section_content();
-
                     break;
-
             }
-
             ?>
-
         </div>
-
     </div>
-
     <?php
-
 }
-
-
-
-
 
 // Content for the Job Section tab
 
 function hrjobs_job_section_content()
-
 {
-
     // Include the job_section.php file
-
     include plugin_dir_path(__FILE__) . 'job_section.php';
-
 }
-
 
 
 // Content for the Posted Applications tab
-
 function hrjobs_posted_applications_content()
-
 {
-
     // Include the post_application.php file
-
     include plugin_dir_path(__FILE__) . 'post_application.php';
-
 }
-
-
 
 
 function hrjobs_view_job_content($job_id)
-
 {
-
     global $wpdb;
-
     $table_jobs = $wpdb->prefix . 'jobs';
 
-
-
     // Fetch job data from the database
-
     $job = $wpdb->get_row($wpdb->prepare("SELECT * FROM $table_jobs WHERE id = %d", $job_id));
 
-
-
     if ($job) {
-
-
-
     ?>
 
         <a href="?page=hrjobs&tab=jobs" class="button">Back to Job List</a>
-
         <h2><?php echo esc_html($job->job_title); ?></h2>
-
         <p><strong>Location:</strong> <?php echo esc_html($job->location); ?></p>
-
         <p><strong>Country:</strong> <?php echo esc_html($job->country); ?></p>
-
         <p><strong>Tagline:</strong> <?php echo esc_html($job->tagline); ?></p>
-
         <p><strong>Job Brief:</strong> <?php echo wp_kses_post($job->job_brief); ?></p>
-
         <p><strong>Responsibilities:</strong> <?php echo wp_kses_post($job->responsibilities); ?></p>
-
         <p><strong>Requirement:</strong> <?php echo wp_kses_post($job->requirement); ?></p>
-
         <p><strong>Date of Application:</strong> <?php echo esc_html($job->date_of_application); ?></p>
-
         <p><strong>Status:</strong> <?php echo $job->status ? 'Open' : 'Closed'; ?></p>
-
     <?php
 
     } else {
-
         echo '<p>Job not found.</p>';
-
     }
-
 }
-
-
-
 
 
 function hrjobs_edit_job_content($job_id)
@@ -669,7 +526,9 @@ function custom_search_shortcode()
 .accordion.active{
    border-bottom:0 !important;
 }
-
+.panel table td {
+    box-shadow: inset 0px 0px 1px 0px rgb(255 255 255) !important;
+}
 
 .apply-form {
     display: flex;
@@ -961,8 +820,10 @@ function filter_jobs_ajax() {
     if (!empty($countries)) {
         $countries_placeholder = implode(',', array_fill(0, count($countries), '%s'));
         $query .= " AND country IN ($countries_placeholder)";
+        $query .= " ORDER BY date_of_application DESC";
         $results = $wpdb->get_results($wpdb->prepare($query, ...$countries));
     } else {
+        $query .= " ORDER BY date_of_application DESC";
         $results = $wpdb->get_results($query);
     }
 
@@ -1008,7 +869,7 @@ function filter_jobs_ajax() {
                             </div>
                             <div class="input-box phone"> 
                                 <label for="phone">Phone Number</label>
-                                <input type="text" id="phone" name="phone" pattern="[0-9]+" required title="Please enter a valid phone number containing only digits.">
+                                <input type="text" id="phone" name="phone" pattern="[0-9]+" required title="Please enter a valid phone number containing only digits." max="10">
                             </div>
                             <div class="input-box date"> 
                                 <label for="birthday">Date of Birth</label>
@@ -1049,38 +910,46 @@ add_action('wp_ajax_filter_jobs', 'filter_jobs_ajax');
 add_action('wp_ajax_nopriv_filter_jobs', 'filter_jobs_ajax');
 
 
-
-
 function enqueue_custom_ajax_script() {
     ?>
     <script>
-jQuery(document).ready(function($) {
-    // Use event delegation to ensure dynamically added forms are targeted
-    $(document).on('submit', '#forms', function(e) {
-        e.preventDefault();
-        var $form = $(this);
-        var formData = new FormData($form[0]); // Convert the form to FormData for file uploads
-        
-        $.ajax({
-            url: $form.attr('action'),
-            type: 'POST',
-            data: formData,
-            processData: false, // Important for file uploads
-            contentType: false, // Important for file uploads
-            success: function(response) {
-                if (response.success) {
-                    alert('Application submitted successfully.');
-                } else {
-                    alert('Error: ' + response.data.message);
+    jQuery(document).ready(function($) {
+        // Use event delegation to ensure dynamically added forms are targeted
+        $(document).on('submit', '#forms', function(e) {
+            e.preventDefault();
+            
+            var $form = $(this);
+            var $submitButton = $form.find('button[type="submit"]'); // Target submit button
+            var originalButtonText = $submitButton.text(); // Store original text
+
+            // Disable button and change text
+            $submitButton.prop('disabled', true).text('Submitting...').css('pointer-events', 'none');
+
+            var formData = new FormData($form[0]); // Convert the form to FormData for file uploads
+            
+            $.ajax({
+                url: $form.attr('action'),
+                type: 'POST',
+                data: formData,
+                processData: false, // Important for file uploads
+                contentType: false, // Important for file uploads
+                success: function(response) {
+                    if (response.success) {
+                        alert('Application submitted successfully.');
+                    } else {
+                        alert('Error: ' + response.data.message);
+                    }
+                },
+                error: function() {
+                    alert('There was an error submitting the form.');
+                },
+                complete: function() {
+                    // Re-enable button and restore text after request completes
+                    $submitButton.prop('disabled', false).text(originalButtonText).css('pointer-events', 'all');
                 }
-            },
-            error: function() {
-                alert('There was an error submitting the form.');
-            }
+            });
         });
     });
-});
-
     </script>
     <?php
 }
@@ -1163,7 +1032,5 @@ function handle_job_application_submission() {
 
 add_action('wp_ajax_check_ajax_working', 'handle_job_application_submission');
 add_action('wp_ajax_nopriv_check_ajax_working', 'handle_job_application_submission');
-
-
 
 ?>
