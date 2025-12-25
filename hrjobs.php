@@ -4,7 +4,7 @@ Plugin Name: HR Jobs
 Description: A plugin to manage job applications and job postings.
 Version: 1.7
 Author: AnkushShinari
-Created For: TAS
+Created For: TAS and (seazengroup.com/)
 */
 
 // Exit if accessed directly.
